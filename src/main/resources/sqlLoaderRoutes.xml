@@ -1,0 +1,70 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd
+    ">
+
+    <!-- this is an included XML file where we only the the routeContext -->
+    <routeContext id="sqlLoaderRoutes" xmlns="http://camel.apache.org/schema/spring">
+        <route id="sqlQuery">
+
+            <!--
+                headers to consider
+                    source name
+                    extract id (i.e. date/cutoff point)
+                    number of records
+                    target table
+                    operation
+                    checksum?
+                body
+                    list of (records)
+                        map of (record)
+                            key value pairs (column)
+
+                from ref: subscribe to topic of interest
+                determine table to apply to
+                insert or update/replace
+                to ref: sql endpoint
+                publish completion event
+
+                note: if redshift, the s3 copy command can be used for inserting large batches
+            -->
+
+            <from uri="ref:extractSqlTable"/>
+            <setHeader headerName="CamelSqlQuery">
+                <simple><![CDATA[
+                    SELECT id, username, md5(email) as email_md5, state, membership_state, created_at, updated_at
+                    from public.users
+                    limit 10;
+                ]]></simple>
+            </setHeader>
+            <to uri="sql:?dataSource=warehouse"/>
+            <!--<log message="queried sql ${headers} ${body}" loggingLevel=""/>-->
+            <marshal>
+                <csv delimiter="|"/>
+            </marshal>
+            <marshal>
+                <gzip/>
+            </marshal>
+            <setHeader headerName="FileKey">
+                <ruby>
+                    require 'date';
+                    @d=$request.headers['migrationLastUpdate'];
+                    "#{$request.headers['migrationSource']}-#{@d.strftime('%Y%m%d%H%M%S%L')}"
+                </ruby>
+            </setHeader>
+            <setHeader headerName="CamelFileName">
+                <ruby>
+                    require 'date';
+                    @d=$request.headers['migrationLastUpdate'];
+                    "extracts/#{@d.strftime('%Y/%m-%B/%m-%d-%Y/')}#{$request.headers['FileKey']}.gz"
+                </ruby>
+            </setHeader>
+            <removeHeaders pattern="*" excludePattern="CamelFileName|CamelSqlRowCount|FileKey|migrationLastUpdate|migrationSource"/>
+            <log message="created extract ${headers}" loggingLevel="DEBUG"/>
+        </route>
+
+    </routeContext>
+
+</beans>

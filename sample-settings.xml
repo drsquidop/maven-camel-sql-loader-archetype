@@ -1,0 +1,38 @@
+<!--Put your version of this file in ~/.m2/settings.xml-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                      http://maven.apache.org/xsd/settings-1.0.0.xsd">
+    <localRepository/>
+    <interactiveMode/>
+    <usePluginRegistry/>
+    <offline/>
+    <pluginGroups/>
+    <servers/>
+
+    <profiles>
+        <!--configuration for test environment-->
+        <profile>
+            <id>test</id>
+            <properties>
+                <envPrefix>test</envPrefix>
+
+                <awsAccessKey>changeme</awsAccessKey>
+                <awsSecretKey>changeme/</awsSecretKey>
+                <awsProfile>test</awsProfile>
+                <awsDefaultRegion>us-west-2</awsDefaultRegion>
+
+                <sqlWarehouseHost>change.me.redshift.amazonaws.com:5439</sqlWarehouseHost>
+                <sqlWarehouseDatabase>warehouse_dt</sqlWarehouseDatabase>
+                <sqlWarehouseUser>warehouse_service</sqlWarehouseUser>
+                <sqlWarehousePassword>changeme</sqlWarehousePassword>
+            </properties>
+        </profile>
+        <profile>
+            <id>local-repo</id>
+            <properties>
+                <distMgmtSnapshotsUrl>http://change.me</distMgmtSnapshotsUrl>
+            </properties>
+        </profile>
+    </profiles>
+</settings>

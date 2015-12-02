@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context-2.5.xsd
+       http://camel.apache.org/schema/spring
+       http://camel.apache.org/schema/spring/camel-spring.xsd">
+
+    <context:property-placeholder location="file:${jetty.home}/etc/server.properties" />
+
+    <bean id="properties" class="org.apache.camel.component.properties.PropertiesComponent">
+        <property name="location" value="file:${jetty.home}/etc/server.properties"/>
+    </bean>
+
+    <import resource="sqlLoaderRoutes.xml"/>
+
+    <camelContext id="sqlLoaderTest" xmlns="http://camel.apache.org/schema/spring">
+        <package>change.me</package>
+
+        <routeContextRef ref="sqlLoaderRoutes"/>
+
+        <endpoint id="extractSqlTable" uri="direct:extractSqlTable"/>
+        <endpoint id="archiveFolderEndpoint" uri="file:${archiveDir}?fileExist=Override"/>
+
+        <route>
+            <from uri="direct:start"/>
+            <!--setup-->
+            <to uri="sql:delete from person?dataSource=warehouse"/>
+            <to uri="sql:select count(*) from person?dataSource=warehouse"/>
+            <!--<log message="sql setup complete ${headers}" loggingLevel="INFO"/>-->
+            <to uri="mock:setupComplete"/>
+            <setHeader headerName="migrationSource">
+                <simple>users</simple>
+            </setHeader>
+            <setHeader headerName="migrationLastUpdate">
+                <ruby>require 'date'; DateTime.now.new_offset(0)</ruby>
+            </setHeader>
+            <to uri="ref:extractSqlTable"/>
+            <to uri="mock:extractResult"/>
+            <to uri="ref:archiveFolderEndpoint"/>
+            <to uri="direct:S3Writer"/>
+            <to uri="mock:S3Result"/>
+            <setBody>
+                <simple></simple>
+            </setBody>
+            <to uri="direct:importIntowarehouse"/>
+            <to uri="sql:select count(*) from person?dataSource=warehouse"/>
+            <!--<log message="Received ${headers} ${body} at end" loggingLevel="INFO"/>-->
+            <to uri="mock:sqlResult"/>
+        </route>
+
+    </camelContext>
+
+    <bean id="warehouse" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+        <property name="driverClassName" value="org.h2.Driver" />
+        <property name="url" value="jdbc:h2:file:foobar.h2.db" />
+        <property name="username" value="sa" />
+        <property name="password" value="" />
+    </bean>
+
+</beans>
