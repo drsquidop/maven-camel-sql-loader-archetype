@@ -3,6 +3,42 @@
 
 Archetype for loading data off the bus into SQL
 
+Thanks to:
+
+* http://www.luckyryan.com/2013/02/15/create-maven-archetype-from-existing-project/
+* http://marosmars.weebly.com/blog/maven-archetype-tutorial
+
+# creating & installing the archetype project
+
+    mvn clean archetype:create-from-project
+    cd target/generated-sources/archetype
+    mvn install
+
+# testing the archetype project
+
+    #cd to the directory above (target/generated-sources/archetype)
+    # add 'clean test' to goal.txt
+    mvn clean install archetype:integration-test
+
+# deploying the archetype
+
+# creating a new project from the archetype
+
+    #in a new folder
+    mvn archetype:generate -X -e \
+    -DarchetypeGroupId=la.isg \
+    -DarchetypeArtifactId=maven-camel-sql-loader-archetype \
+    -DarchetypeVersion=0.2.0-SNAPSHOT \
+    -DgroupId=com.fandango \
+    -DartifactId=data-warehouse-loader \
+    -DinteractiveMode=true
+
+Test it with
+
+    mvn clean test
+        
+If all goes well, all tests should pass.
+
 ### Running in jetty
 
 >mvn jetty:run-forked -DskipTests -Ptest
