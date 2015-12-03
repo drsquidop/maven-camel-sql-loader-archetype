@@ -31,38 +31,17 @@
                 note: if redshift, the s3 copy command can be used for inserting large batches
             -->
 
-            <from uri="ref:extractSqlTable"/>
-            <setHeader headerName="CamelSqlQuery">
-                <simple><![CDATA[
-                    SELECT id, username, md5(email) as email_md5, state, membership_state, created_at, updated_at
-                    from public.users
-                    limit 10;
-                ]]></simple>
-            </setHeader>
-            <to uri="sql:?dataSource=warehouse"/>
-            <!--<log message="queried sql ${headers} ${body}" loggingLevel=""/>-->
-            <marshal>
-                <csv delimiter="|"/>
-            </marshal>
-            <marshal>
-                <gzip/>
-            </marshal>
-            <setHeader headerName="FileKey">
-                <ruby>
-                    require 'date';
-                    @d=$request.headers['migrationLastUpdate'];
-                    "#{$request.headers['migrationSource']}-#{@d.strftime('%Y%m%d%H%M%S%L')}"
-                </ruby>
-            </setHeader>
-            <setHeader headerName="CamelFileName">
-                <ruby>
-                    require 'date';
-                    @d=$request.headers['migrationLastUpdate'];
-                    "extracts/#{@d.strftime('%Y/%m-%B/%m-%d-%Y/')}#{$request.headers['FileKey']}.gz"
-                </ruby>
-            </setHeader>
-            <removeHeaders pattern="*" excludePattern="CamelFileName|CamelSqlRowCount|FileKey|migrationLastUpdate|migrationSource"/>
-            <log message="created extract ${headers}" loggingLevel="DEBUG"/>
+            <from uri="ref:replace"/>
+            <validate>
+                <!--<simple>bodyAs(List).size > 0</simple>-->
+                <simple>true</simple>
+            </validate>
+            <!-- body contains the rows to add -->
+            <!--<to uri="sql:select count(*) from person?dataSource=warehouse"/>-->
+            <to uri="sql:insert into person(id, name) values(#,#)?dataSource=warehouse"/>
+            <log message="inserted rows ${headers} ${body}" loggingLevel="DEBUG"/>
+            <!--<removeHeaders pattern="*" excludePattern="CamelFileName|CamelSqlRowCount|FileKey|migrationLastUpdate|migrationSource"/>-->
+            <to uri="ref:replaced"/>
         </route>
 
     </routeContext>

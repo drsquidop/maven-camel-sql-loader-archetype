@@ -32,27 +32,6 @@
 
         <endpoint id="archiveFolderEndpoint" uri="file:${archiveDir}?fileExist=Override"/>
 
-        <route>
-            <from uri="ref:runExtract"/>
-            <!--setup-->
-            <to uri="sql:delete from users?dataSource=warehouse"/>
-            <to uri="sql:select count(*) from users?dataSource=warehouse"/>
-            <!--<log message="sql setup complete ${headers}" loggingLevel="INFO"/>-->
-            <to uri="mock:setupComplete"/>
-            <setHeader headerName="migrationSource">
-                <simple>users</simple>
-            </setHeader>
-            <setHeader headerName="migrationLastUpdate">
-                <ruby>require 'date'; DateTime.now.new_offset(0)</ruby>
-            </setHeader>
-            <setBody>
-                <simple></simple>
-            </setBody>
-            <to uri="direct:importIntowarehouse"/>
-            <to uri="sql:select count(*) from users?dataSource=warehouse"/>
-            <!--<log message="Received ${headers} ${body} at end" loggingLevel="INFO"/>-->
-            <to uri="mock:sqlResult"/>
-        </route>
     </camelContext>
 
     <!--this needs to use SSL unless perhaps it is inside a vpc!-->

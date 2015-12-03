@@ -23,41 +23,50 @@
 
         <routeContextRef ref="sqlLoaderRoutes"/>
 
-        <endpoint id="extractSqlTable" uri="direct:extractSqlTable"/>
-        <endpoint id="archiveFolderEndpoint" uri="file:${archiveDir}?fileExist=Override"/>
+        <endpoint id="replace" uri="seda:replace"/>
+        <endpoint id="replaced" uri="seda:replaced"/>
 
         <route>
-            <from uri="direct:start"/>
-            <!--setup-->
-            <to uri="sql:delete from person?dataSource=warehouse"/>
-            <to uri="sql:select count(*) from person?dataSource=warehouse"/>
-            <!--<log message="sql setup complete ${headers}" loggingLevel="INFO"/>-->
-            <to uri="mock:setupComplete"/>
-            <setHeader headerName="migrationSource">
-                <simple>users</simple>
-            </setHeader>
-            <setHeader headerName="migrationLastUpdate">
-                <ruby>require 'date'; DateTime.now.new_offset(0)</ruby>
-            </setHeader>
-            <to uri="ref:extractSqlTable"/>
-            <to uri="mock:extractResult"/>
-            <to uri="ref:archiveFolderEndpoint"/>
-            <to uri="direct:S3Writer"/>
-            <to uri="mock:S3Result"/>
-            <setBody>
-                <simple></simple>
-            </setBody>
-            <to uri="direct:importIntowarehouse"/>
-            <to uri="sql:select count(*) from person?dataSource=warehouse"/>
-            <!--<log message="Received ${headers} ${body} at end" loggingLevel="INFO"/>-->
-            <to uri="mock:sqlResult"/>
+            <from uri="ref:replaced"/>
+            <to uri="sql:select count(*) as count from person?dataSource=warehouse"/>
+            <to uri="mock:sqlRowsReplaced"/>
         </route>
+
+        <route>
+            <from uri="direct:clear"/>
+            <to uri="sql:delete from person?dataSource=warehouse"/>
+            <to uri="mock:cleared"/>
+        </route>
+
+        <route>
+            <from uri="direct:replaceCsv"/>
+            <unmarshal>
+                <csv/>
+            </unmarshal>
+            <split>
+                <simple>${body}</simple>
+                <to uri="ref:replace"/>
+            </split>
+        </route>
+
+        <!--<route>-->
+            <!--<from uri="direct:insertOne"/>-->
+            <!--&lt;!&ndash;-->
+                <!--Thanks Claus,-->
+                <!--A CSV unmarshals to List(List,...), we need List(Map,...) for the sql component-->
+                <!--see http://camel.465427.n5.nabble.com/problem-processing-CSV-to-Database-camel-csv-and-camel-sql-td5735821.html-->
+                <!--&ndash;&gt;-->
+            <!--&lt;!&ndash;<transform>&ndash;&gt;-->
+                <!--&lt;!&ndash;<simple>${body[0]}</simple>&ndash;&gt;-->
+            <!--&lt;!&ndash;</transform>&ndash;&gt;-->
+            <!--<to uri="ref:replace"/>-->
+        <!--</route>-->
 
     </camelContext>
 
     <bean id="warehouse" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
         <property name="driverClassName" value="org.h2.Driver" />
-        <property name="url" value="jdbc:h2:file:foobar.h2.db" />
+        <property name="url" value="jdbc:h2:file:target/foobar" />
         <property name="username" value="sa" />
         <property name="password" value="" />
     </bean>

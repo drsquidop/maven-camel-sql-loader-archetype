@@ -11,6 +11,7 @@ import org.apache.camel.test.spring.CamelSpringJUnit4ClassRunner;
 import org.apache.camel.test.spring.CamelTestContextBootstrapper;
 import org.apache.camel.test.spring.DisableJmx;
 import org.apache.camel.test.spring.MockEndpoints;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -18,6 +19,9 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.BootstrapWith;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * User: doug
@@ -34,21 +38,29 @@ import org.springframework.test.context.TestPropertySource;
 @DisableJmx(false)
 public class SqlLoaderTest {
 
-    @Produce(uri = "direct:start")
+    @Produce(uri = "ref:replace")
     protected ProducerTemplate template;
 
-    @EndpointInject(uri = "mock:setupComplete")
-    protected MockEndpoint setupCompleteEndpoint;
+    @Produce(uri = "direct:replaceCsv")
+    protected ProducerTemplate insertCsvEndpoint;
 
-    @EndpointInject(uri = "mock:extractResult")
-    protected MockEndpoint extractResultEndpoint;
+    @EndpointInject(uri = "mock:sqlRowsReplaced")
+    protected MockEndpoint resultEndpoint;
 
-    @EndpointInject(uri = "mock:S3Result")
-    protected MockEndpoint s3ResultEndpoint;
+    @Produce(uri = "direct:clear")
+    protected ProducerTemplate clearEndpoint;
 
-    @EndpointInject(uri = "mock:sqlResult")
-    protected MockEndpoint sqlResultEndpoint;
+    @EndpointInject(uri = "mock:cleared")
+    protected MockEndpoint clearedEndpoint;
 
+    @DirtiesContext
+    @Before
+    public void beforeEach() throws Exception {
+        //delete all rows
+        clearedEndpoint.expectedMessageCount(1);
+        clearEndpoint.sendBody("");
+        clearedEndpoint.assertIsSatisfied();
+    }
 
     //a test data set loaded from file is inserted into SQL
     //mock the endpoint
@@ -58,22 +70,46 @@ public class SqlLoaderTest {
     //another option: use a camel sql query
     @DirtiesContext
     @Test
-    public void testFullETL() throws Exception {
-        //the table is clear at start
-        setupCompleteEndpoint.expectedBodiesReceived("[{count=0}]");
-        //we created 1 extract
-        extractResultEndpoint.expectedMessageCount(1);
-        //we uploaded 1 extract to S3
-        s3ResultEndpoint.expectedMessageCount(1);
+    public void testSendEmptyList() throws Exception {
+        //it should not send 'replaced' if the body is an empty list
+        resultEndpoint.expectedMessageCount(0);
+
+        //create our test data
+        List testData = new ArrayList();
+
+        template.sendBody(testData);
+
+        resultEndpoint.assertIsSatisfied();
+    }
+
+    @DirtiesContext
+    @Test
+    public void testInsert1Row() throws Exception {
         //we have 10 records in the warehouse
-        sqlResultEndpoint.expectedBodiesReceived("[{count=10}]");
+        resultEndpoint.expectedBodiesReceived("[{COUNT=1}]");
+        resultEndpoint.expectedMessageCount(1);
 
-        template.sendBody("");
+        //create our test data
+        String testData = "1,Joe";
 
-        setupCompleteEndpoint.assertIsSatisfied();
-        extractResultEndpoint.assertIsSatisfied();
-        s3ResultEndpoint.assertIsSatisfied();
-        sqlResultEndpoint.assertIsSatisfied();
+        insertCsvEndpoint.sendBody(testData);
+
+        resultEndpoint.assertIsSatisfied();
+    }
+
+    @DirtiesContext
+    @Test
+    public void testInsertNRows() throws Exception {
+        //resultEndpoint.expectedBodiesReceived("[{COUNT=2}]");
+        resultEndpoint.expectedMessageCount(2);
+        resultEndpoint.message(1).body().isEqualTo("[{COUNT=2}]");
+
+        //create our test data
+        String testData = "1,Joe\n2,Steve";
+
+        insertCsvEndpoint.sendBody(testData);
+
+        resultEndpoint.assertIsSatisfied();
     }
 }
 
